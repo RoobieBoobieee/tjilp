@@ -1,58 +1,81 @@
-#include <MHZ19.h>
-MHZ19 mhz(&Serial1); // library can be found at: https://github.com/strange-v/MHZ19
-#include <Adafruit_NeoPixel.h>
+#include <MHZ19.h>  // library can be found at: https://github.com/strange-v/MHZ19
+#include <Adafruit_NeoPixel.h> // https://github.com/adafruit/Adafruit_NeoPixel
 
+// Pin to the LED
 #define pixelpin 8
+// Number of LEDs on the strip
+#define nr_of_pixels 1
+
+// Communication w/ CO2 sensor
 #define serial_rx 7
 #define serial_tx 6
+
+// Buzzer
 #define spiezopin 5
 #define piezopin 4
-MHZ19_RESULT response;
 
-#define nr_of_pixels 1
+
 Adafruit_NeoPixel pixel(nr_of_pixels, pixelpin, NEO_GRB + NEO_KHZ800);
 
+MHZ19 mhz(&Serial1);
 void setup() {
+  // Init LED
   pixel.begin();
   pixel.clear();
   pixel.setBrightness(225);
+
+  // Set color
+  pixel.fill(pixel.Color(80, 80, 80)); pixel.show();
+
+  // Init serial
   Serial.begin(115200);
   Serial1.begin(9600);
-  pixel.fill(pixel.Color(80, 80, 80)); pixel.show();
-  chirp(HIGH);
-  response = mhz.retrieveData();
-}
 
-void loud_mode() {
-  pinMode(piezopin, OUTPUT);
-  pinMode(spiezopin, INPUT);
-}
-void silent_mode() {
-  pinMode(piezopin, INPUT);
-  pinMode(spiezopin, OUTPUT);
+  // Chirp once after setup
+  chirp(HIGH);
 }
 
 void loop() {
   for (int t = 0; t < random(30, 300); t++) {
-    // We take a reading every sec
-    response = mhz.retrieveData();
+
+    // Read from the CO2 sensor
+    MHZ19_RESULT response = mhz.retrieveData();
+
+    // Keep trying until we get a valid response
     while (response != MHZ19_RESULT_OK) {
+      Serial.print("Response NOK. Retrying. ");
+    Serial.print("got: ");
+    if (response == MHZ19_RESULT_ERR_CRC) {
+      Serial.println("err crc");
+    } else if (response == MHZ19_RESULT_ERR_TIMEOUT) {
+      Serial.println("err timeout");
+    } else {
+      Serial.println(response);
+    }
+    
       pixel.fill(pixel.Color(0, 0, 255)); pixel.show();
       delay(100);
       response = mhz.retrieveData();
     }
+
+    // Reading successful. Get the CO2 value
     int co2 = mhz.getCO2();
-    Serial.print(F("CO2: "));
+    Serial.print("CO2: ");
     Serial.print(co2);
 
-    int R = map(co2, 200, 2000, 0, 255);
-    int G = map(co2, 200, 2000, 255, 0);
-    R = constrain(R, 0, 255);
+
+    // Map value to RGB color
+    int G = map(co2, 200, 2000, 0, 255);
+    int R = map(co2, 200, 2000, 255, 0);
     G = constrain(G, 0, 255);
+    R = constrain(R, 0, 255);
+
+    // Set the LED with the color generated
     pixel.fill(pixel.Color(R, G, 0)); pixel.show();
 
+
     if (co2 > 1400) {
-      //big alarm
+      // Big alarm
       Serial.println(F(" That's horrible!"));
       loud_mode();
       for (int l = 0; l < 15; l++) {
@@ -62,7 +85,7 @@ void loop() {
         }
       }
     } else if (co2 > 850) {
-      //small alarm
+      // Small alarm
       Serial.println(F(" That's not so good!"));
       silent_mode();
       for (int l = 0; l < 10; l++) {
@@ -71,11 +94,9 @@ void loop() {
           tweet(random(2, 12), 2);
         }
       }
-    } else if (co2 > 600) {
-      Serial.println(F(" That is ok"));
-      delay(1000);
     } else {
-      Serial.println(F(" That is great!"));
+      Serial.println(F(" That is ok!"));
+      // Wait a second before a new reading
       delay(1000);
     }
   }
@@ -151,4 +172,14 @@ void tweet(int intensity, int chirpsNumber) {
     }
   }
   delay(1000);
+}
+
+void loud_mode() {
+  pinMode(piezopin, OUTPUT);
+  pinMode(spiezopin, INPUT);
+}
+
+void silent_mode() {
+  pinMode(piezopin, INPUT);
+  pinMode(spiezopin, OUTPUT);
 }
