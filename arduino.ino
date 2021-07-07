@@ -65,8 +65,8 @@ void loop() {
 
 
     // Map value to RGB color
-    int G = map(co2, 200, 2000, 0, 255);
-    int R = map(co2, 200, 2000, 255, 0);
+    int G = map(co2, 200, 1400, 0, 255);
+    int R = map(co2, 200, 1400, 255, 0);
     G = constrain(G, 0, 255);
     R = constrain(R, 0, 255);
 
